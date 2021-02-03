@@ -1,5 +1,3 @@
 # ADS Project 1:  R Notebook on the Presidential Elections in the US
 
-### Doc folder
-
-The doc directory contains the report or presentation files. It can have subfolders.  
+From this project,I analyzed how the the type of neighborhood (rural or non-rural), as well as type of language used in the interview affects voter behavior such as registration, turnout, and, party votes. A further analysis was done intersecting it with race, with the findings being that up until the question was asked (year 2000), there did not seem to be a major difference between rural and non-rural people in terms of voting and surprisingly, the proportion between White and Non-white people. While there was not enough data for people who didn't only use English in the interview, there appears to be an inrcrease toward proportion voting Democratic candidates among people who used some Spanish in the past few elections. 
