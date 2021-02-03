@@ -1,0 +1,279 @@
+---
+title: "Voting Demographics by Language and Rurality Over the Years"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# 1. Introduction
+
+Throughout elections in the United States, demographics have changed with the arrival of new immigrants as well as change in population growths among differenct races. With the new immigrants, many might have a diffrent primary language than English, which might make it more difficult to be able to register to vote. Additionally, some people may have moved to different types of environments, particularly to or from rural areas. While we may have preconcieved speculations, this project seeks to understand the changes in the voters in the fields of race, type of neighborhood (whether it is rural or not), language, voting choice, and turnout. 
+
+
+
+# 2. Preparation
+
+Before we look at the data, we need to install certain packages that will assist with procuring and standardizing our dataset, as well as more efficiently order it to our preference. 
+
+```{r load libraries, warning=FALSE, message=FALSE, include=FALSE}
+packages.used=as.list(
+  c(
+  "tidyverse",
+  "haven",
+  "devtools",
+  "RColorBrewer",
+  "ggplot2",
+  "dplyr")
+)
+check.pkg = function(x){
+  if(!require(x, character.only=T)) install.packages(x, 
+                                                     character.only=T,
+                                                     dependence=T)
+}
+lapply(packages.used, check.pkg)
+```
+
+Additionally, we may need to process our data to allow it to be used. To do this, we will use the read_sav function from the haven package to transform the sav file into a dataframe. 
+
+```{r}
+library(haven)
+anes_dat <-
+    read_sav(".../data/anes_timeseries_cdf.sav")
+```
+
+Finally, we may need to wrap the strings of our factor levels so they fit
+
+```{r}
+swr = function(string, nwrap=20) {
+  paste(strwrap(string, width=nwrap), collapse="\n")
+}
+swr = Vectorize(swr)
+```
+
+
+
+# 3. Looking at Our Factors
+
+Looking at our dataset, we can notice that there are plenty of variables. The first one, VCF0004, may be our most important, since it keeps track of the year a person answered some if not all of these questions. 
+
+```{r}
+barplot(table(anes_dat$VCF0004),
+        las=2,
+        main="number of respondents over the years")
+```
+
+Now we'll take a look at how various answers may have changed over the years. We'll prime a dataset with factors that seem relavent to the interests we mentioned in the introduction. First, we'll look at how voter turnout is impacted by language used and type of neighborhood to give us a sense of participation. 
+
+
+```{r labelled variables subset}
+Election_years=as.character(seq(1952, 2016, 4))
+anes_use=anes_dat%>%
+  mutate(
+    year=as_factor(VCF0004),
+    turnout=as_factor(VCF0703),
+    vote=as_factor(VCF0706),
+    race=as_factor(VCF0105a),
+    rurality = as_factor(VCF0134),
+    lang = as_factor(VCF0018a),
+  )%>%
+  filter(year %in% Election_years) %>%
+  mutate(rurality = recode(rurality, "1. Farm/country (including 'in the country, not on a" = "1. Farm/country"),
+         race = recode(race, "1. White non-Hispanic (1948-2012)" = "1. White non-Hispanic",
+                       "2. Black non-Hispanic (1948-2012)" = "2. Black non-Hispanic",
+                       "7. Non-white and non-black (1948-1964)" = "7. Non-white and non-black",
+                       "6. Other or multiple races, non-Hispanic (1968-2012)" = "6 .Other or multiple races",
+                       "3. Asian or Pacific Islander, non-Hispanic (1966-2012)" = "3. Asian or Pacific Islander",
+                       "5. Hispanic (1966-2012)" = "5. Hispanic",
+                       "4. American Indian or Alaska Native non-Hispanic (1966-2012)" = "4. American Indian or Alaska Native"
+                       ),
+         lang = recode(lang, "0. IW conducted entirely in English; 2008,2012: beginning language" = "0. Entirely in English",
+                       "1. Some or all of IW translated to Spanish" = "1. Some or all to Spanish",
+                       "3. Some or all of IW translated to French" = "3. Some or all to French",
+                       "5. Some or all of IW translated to non-English language other than Spanish or French" = 
+                         "5. Non-English language other than Spanish or French"
+                       ),
+         vote = recode(vote, "7. Did not vote or voted but not for president (exc.1972)" = "7. Didn't vote for president",
+                       "4. Other (incl. 3d/minor party candidates and write-ins)" = "4. Other",
+                       "3. Major third party candidate (Wallace 1968/Anderson" = "3. Major third party candidate")) %>%
+  select(year, race, vote, rurality, lang, turnout) 
+
+save(anes_use, file="../output/data_use.RData")
+```
+
+```{r}
+unique(anes_use$vote)
+```
+
+
+With migration comes potential changes in the demographics of the population, as well as with voters. However, many new migrants might not speak English or at the very least, English might not be their first language, making it harder to vote. Over time, institutions could have realized that this was a problem, and may have given an option for voting and registration in their home language. With our analysis, we shall see if the proportion for turnout changed among various languages.
+
+```{r}
+library(tidyverse)
+yearxlang <- anes_use %>%
+  select(year, turnout, lang) %>%
+  filter(!is.na(turnout) & !is.na(lang)) %>%
+  group_by(year, lang) %>%
+  count(turnout) %>%
+  group_by(year, lang) %>%
+  mutate(prop = n/sum(n))
+  
+
+ggplot(yearxlang, aes(x = year, y = prop, fill = turnout)) +
+  geom_bar(stat="identity", colour="black")+ 
+  scale_fill_manual(values=c("firebrick2","dodgerblue3",  "green4"))+
+  facet_wrap(~lang, ncol=1) + 
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title="Relationship between language used in \n the interview and turnout over the years")
+  
+```
+
+Due to the missing data, it is hard to deduce an increase or decrease for the proportion of registered voters who did at least part of the survey in a non-English language. Jarringly, there is a huge amount of gaps in the information regarding Spanish and almost no data regarding French or other languages. Prior to 1978, there is much uncertainty whether full or partial translations occurred, so all of the answers were coded to being conducted entirely in English, even if they weren't. As for after 1978, one could assume that not enough people were sampled (interviewed) to find someone who didn't fully use English who also didn't use Spanish aside from in 1980 and 1988.  One thing of note is that people who answered at least part of the interview in Spanish were less likely to both vote and be registered to vote than people who did the entire interview in English. However, I still can't find an explanation for why there were no people who used Spanish in the interview from 1996 - 2004. My guess is that they only did the interview in English or Spanish users answered N/A to the turnout question.To test this theory, I decided to look at the same question, but allow for an N/A answer to the voter turnout question. 
+
+```{r}
+library(tidyverse)
+yearxlang <- anes_use %>%
+  select(year, turnout, lang) %>%
+  filter(!is.na(lang)) %>%
+  group_by(year, lang) %>%
+  count(turnout) %>%
+  group_by(year, lang) %>%
+  mutate(prop = n/sum(n))
+  
+
+ggplot(yearxlang, aes(x = year, y = prop, fill = turnout)) +
+  geom_bar(stat="identity", colour="black")+ 
+  scale_fill_manual(values=c("firebrick2","dodgerblue3",  "green4"))+
+  facet_wrap(~lang, ncol=1) + 
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title="Relationship between language used in \n the interview and turnout over the years \n (including an N/A answer for turnout)")
+```
+
+This shows that my previous guess that people who used Spanish in the interview all chose N/A for 1996-2004 was wrong. This could possibly mean that either no people who would have utilized Spanish during the interview were sampled or the question was removed during those three election years. In addition, it appears that all of the people that used some French during the interview in 1984 put N/A for the turnout question. My guess is that a very small number of people used French during the interview that year and they all answered N/A. 
+
+
+
+Will also look at the makeup of rural voters over time. Since cities and suburban areas were on the rise from at least the 1950s, I think that the proportion of rural voters has decreased over time. 
+
+```{r}
+yearxrural <- anes_use %>%
+  filter(!is.na(rurality) & turnout == "3. Voted (registered)") %>%
+  group_by(year) %>%
+  count(rurality) %>%
+  group_by(year) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(yearxrural, aes(x = year, y = prop, fill = rurality)) +
+  geom_bar(stat="identity", colour="black")+
+  scale_fill_manual(values=c("dodgerblue3", "lightgoldenrod1")) +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title="What were the proportion of rural voters over the years?")
+
+
+```
+
+Abeit very slight, it appears that the proportion of non-rural voters has generally increased over time, although the rate at which it is increasing appears to be negligable. It is interesting to note that there was an apparent sharp increase in the proportion of non-rural voters in the 1960's and in 1980, with a decrease in the 1970's. Perhaps that can be attributed to a mass migration of voters from rural areas to surburban and urban ones, or due to immigrants coming into non-rural ports and registering to vote. Regardless, this shows that over the years, the majority of the voters come from outside rural neighborhoods, although there is still a significant amount of rural voters. 
+
+
+To get a larger picture, we may want to see proportions of turnout among both rural and non-rural people. 
+ 
+```{r}
+turnoutxrural <- anes_use %>%
+  filter(!is.na(rurality) & !is.na(turnout)) %>%
+  group_by(year, rurality) %>%
+  count(turnout) %>%
+  group_by(year, rurality) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(turnoutxrural, aes(x = year, y = prop, fill = turnout)) +
+  geom_bar(stat="identity", colour="black")+
+  facet_wrap(~rurality, ncol = 1) +
+  scale_fill_manual(values=c("firebrick2","dodgerblue3",  "green4")) +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title="What were the proportions of voter turnout \n by type of neighborhood over the years?")
+```
+
+There does not appear to be much of a difference between the turnouts between people living in rural or non-rural neighborhoods. While at certain times, particularly in the 1950's, non-rural people had a both a larger proportion of both voters and people registered to vote. I hypothesize that there might not have been as good of an outreach to help people in rural areas register and vote. This may have improved with technology. 
+
+
+# 4. Putting it Together
+
+Now that we have seen how the turnouts of our key demographics have changed over the years, we may look at them when juxtaposed with race and whether they voted Democrat, Republican, or Third Party To simplify things, we'll only look at people that used only English or Spanish during the interview. 
+
+First, we'll look at how race and decision are related to the language used in the interview. A simple guess is that there will be many missing values between race and language, as primarily Hispanic people would be reliant on Spanish in an interview. Furthermore, I would guess that people who used Spanish would either vote roughly the same as people that only used English, or they were more biased towards Democrats. 
+
+```{r}
+library(tidyverse)
+langxracexvote <- anes_use %>%
+  select(year, race, lang, vote) %>%
+  mutate(race = swr(race)) %>%
+  filter(!is.na(lang) & !is.na(race) & !is.na(vote)) %>%
+  filter(lang == "0. Entirely in English" | lang == "1. Some or all to Spanish") %>%
+  group_by(year, lang, race) %>%
+  count(vote) %>%
+  group_by(year, lang, race) %>%
+  mutate(prop = n/sum(n)) 
+  
+  
+
+ggplot(langxracexvote, aes(x = year, y = prop, fill = vote)) +
+  geom_bar(stat="identity", colour="black")+ 
+  facet_grid(rows = vars(race), cols = vars(lang)) + 
+  scale_fill_manual(values=c("firebrick2","dodgerblue3",  "green4", "gold", "brown"))+
+  theme(axis.text.x = element_text(angle = 90), strip.text.y = element_text(angle = 0))+
+  labs(title="Proportion of votes by language used in the interview \n and race (including an N/A answer for turnout)")
+```
+
+From what we can see, the only people that used some Spanish during the interviews were either White or Hispanic. This is exactly what we thought, as it didn't seem likely other races would use Spanish. It appears from the limited data that Hispanics vwho did at least part of the interview in Spanish tended to vote Democrat more than those who did it entirely in English, particularly after 2008. One thing of interest is the presence of White people who did at least part of the interview in Spanish in 2012 and 2016. Although due to being all in one category, it is highly possible that there were very few people in those categories, perhaps only one per those two years. Their reasoning for doing the interview in Spanish is intriguing. Although I cannot rule anything out, perhaps they did part of the interview in Spanish to test themselves even though they could speak English fluently.  It
+
+
+
+Now, let's do the same to type of neighborhood. First, let's look at the racial makeup between rural and non-rural areas, before looking at the proportion of votes of each group. 
+
+
+```{r}
+ruralxrace <- anes_use %>%
+  filter(!is.na(rurality) & !is.na(race)) %>%
+  group_by(year, rurality) %>%
+  count(race) %>%
+  group_by(year, rurality) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(ruralxrace, aes(x = year, y = prop, fill = race)) +
+  geom_bar(stat="identity", colour="black")+
+  facet_wrap(~rurality, ncol = 1) +
+  scale_fill_manual(values=c("firebrick2","dodgerblue3",  "green4", "yellow", "orange", "purple", "brown")) +
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title="What were the proportions of type of \n neighborhood by race over the years?")
+```
+
+Surprisingly, there appears to be similar proportions of Non-white people in rural and non-rural areas. However, we msut keep in mind that this question was only asked till 2000. Perhaps in the last 20 years, this proportion may have changed significantly. 
+
+Now, lets see who the people in these various demographics tended to vote for. 
+
+```{r}
+ruralxracexvote <- anes_use %>%
+  filter(!is.na(rurality) & !is.na(race) &!is.na(vote)) %>%
+  mutate(race = swr(race)) %>%
+  group_by(year, rurality, race) %>%
+  count(vote) %>%
+  group_by(year, rurality, race) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(ruralxracexvote, aes(x = year, y = prop, fill = vote)) +
+  geom_bar(stat="identity", colour="black")+
+  facet_grid(cols = vars(rurality), rows = vars(race)) +
+  scale_fill_manual(values=c("firebrick2","dodgerblue3",  "green4", "yellow", "orange", "purple", "brown")) +
+  theme(axis.text.x = element_text(angle = 90), strip.text.y = element_text(angle = 0))+
+  labs(title="What were the proportions of votes by race 
+       \n and type of neighborhood over the years?")
+```
+
+
+From what we can see, there didn't seem to be much difference in voting choice between White voters in rural and non-rural areas. Compared to Non-white voters, White voters appear to have a higher proportion towards voting Republican and actually voting for a president. In addition, it seems that a significant percentage of Black voters didn't vote for preseident, even more so in rural areas. Although this has declined over the years, we can still speculate various reasons for this occuring, such as various forms of voter suppression, inability to vote due to other reasons, and distrust of the election process. Combined with the last graph, it is shown that white people in America make up the biggest percentage of voters.
+
+
+# 5. Conclusion
+
+While much of our hypotheses were supported by the data, such as White people tending to vote Republican more than non-White people, Non-white people being less likely to have voted (although that is decreasing), and almost all of the people who used some Spanish in the interview being Hispanic, there were some new tidbits, such as the differences in proportions of races and voting habits between rural and non-rural areas being surprisingly similar. However, perhaps data after 2000 would tell a different story. Until then, our current data is mixed with both unsurprising and intriguing information. 
+
