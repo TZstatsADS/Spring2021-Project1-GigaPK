@@ -2,5 +2,4 @@
 
 ### Data folder
 
-The data directory contains data used in the analysis. This is treated as read only; in paricular the R/python files are never allowed to write to the files in here. Depending on the project, these might be csv files, a database, and the directory itself may have subdirectories.
-
+Note: I had trouble uploading the file that I used. It apparently was too big, but its the "Time Series Cumulative Data File (1948-2016)" in the data section of ANES's website
